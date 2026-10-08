@@ -1,46 +1,78 @@
-# Callflow proof
+# Callflow to Bitrix24
 
-A minimal voice bot that answers a Twilio call, asks three short questions, extracts structured lead fields through Vercel AI Gateway, and creates a Bitrix24 lead through its REST webhook.
+**Developer:** Afaq Ahmad
 
-## Flow
+A deployable voice bot proof-of-concept that answers an incoming phone call, asks three focused questions, understands short spoken replies, extracts structured lead data, and creates a new lead in Bitrix24 automatically.
 
-`Public Twilio number → /api/twilio/voice → Twilio speech recognition → /api/twilio/answer → AI Gateway → Bitrix24 crm.lead.add`
+## End-to-end flow
+
+```text
+Public phone number
+  -> Twilio Voice webhook: /api/twilio/voice
+  -> Twilio speech recognition
+  -> Conversation handler: /api/twilio/answer
+  -> Structured NLP extraction
+  -> Bitrix24 crm.lead.add
+```
 
 The bot asks:
 
-1. Desired service
-2. Company name
-3. Preferred contact channel
+1. What service does the caller need?
+2. What is the company name?
+3. Which contact channel does the caller prefer?
+
+## Backend files
+
+- `app/api/twilio/voice/route.ts` returns TwiML for the first greeting and question.
+- `app/api/twilio/answer/route.ts` receives each speech result and continues the call.
+- `lib/lead-flow.ts` extracts the answer into typed fields and sends the completed lead to Bitrix24.
+- `app/page.tsx` provides a simple public status page describing the demo.
 
 ## Environment variables
 
-Copy `.env.example` to `.env.local` for local development or add the same variables in Vercel project settings.
+Copy `.env.example` to `.env.local` for local development, or add the variables to the deployment environment.
 
-- `BITRIX24_WEBHOOK_URL`: Bitrix24 incoming webhook base URL, for example `https://your-portal.bitrix24.com/rest/1/xxx`
-- `AI_MODEL`: Optional AI Gateway model. Defaults to `google/gemini-3-flash`.
-- `TWILIO_VOICE`: Optional Twilio voice, defaults to `Polly.Joanna`.
-- `BITRIX24_SOURCE_ID`: Optional Bitrix source ID, defaults to `CALL`.
+- `BITRIX24_WEBHOOK_URL` — Bitrix24 incoming webhook base URL, such as `https://your-portal.bitrix24.com/rest/1/xxx`
+- `AI_MODEL` — optional model identifier; defaults to `google/gemini-3-flash`
+- `TWILIO_VOICE` — optional Polly voice; defaults to `Polly.Joanna`
+- `BITRIX24_SOURCE_ID` — optional Bitrix24 source ID; defaults to `CALL`
 
-AI Gateway authentication is supplied by the Vercel runtime. No AI provider key is required in this app.
+The AI gateway is authenticated by the hosting runtime. No provider API key is exposed to the browser.
 
-## Twilio setup
+## Run locally
 
-1. Deploy this project to a public HTTPS URL.
-2. Buy or connect a Twilio phone number with Voice enabled.
-3. In the number's **Voice configuration**, set **A call comes in** to `https://YOUR_DOMAIN/api/twilio/voice` using `HTTP POST`.
-4. Call the number and answer the three prompts with short sentences.
-5. Confirm a new lead appears in Bitrix24.
+```bash
+pnpm install
+pnpm dev
+```
 
-Twilio's built-in speech recognition is used for this MVP, so no separate STT provider is needed. The server never exposes the Bitrix webhook to the browser.
+For a real phone call, expose the local app through an HTTPS tunnel such as ngrok or Cloudflare Tunnel. The endpoint must be publicly reachable by Twilio.
 
-## Local test
+## Configure Twilio
 
-Run `pnpm dev`, expose the app through an HTTPS tunnel such as ngrok or Cloudflare Tunnel, then use that public URL in Twilio. A browser GET to `/api/twilio/voice` returns the same TwiML as a phone call, but the real acceptance test should be done from a phone because Twilio supplies the speech results.
+1. Buy or connect a Twilio phone number with Voice enabled.
+2. Open the phone number's Voice configuration.
+3. Set **A call comes in** to `https://YOUR_DOMAIN/api/twilio/voice` using HTTP POST.
+4. Call the number and answer each question in a short sentence.
+5. Confirm that a new lead appears in Bitrix24.
 
 ## Bitrix24 mapping
 
-The REST call creates a lead with the desired service in `TITLE`, the company in `COMPANY_TITLE`, the contact preference in `SOURCE_DESCRIPTION`, and the full normalized JSON in `COMMENTS`. The caller's Twilio number can be added to the lead later as a `PHONE` field once the demo's preferred ownership and consent policy are confirmed.
+The completed record is created through `crm.lead.add` with:
 
-## Production notes
+- `TITLE`: desired service
+- `COMPANY_TITLE`: company name
+- `SOURCE_DESCRIPTION`: preferred contact channel
+- `COMMENTS`: normalized JSON containing all captured fields
 
-For a production launch, validate Twilio signatures, add retry/idempotency handling around Bitrix24, log call IDs, and add a fallback path when speech recognition confidence is low. The MVP intentionally keeps the conversation narrow so short-sentence replies are reliable.
+The caller's phone number is available from Twilio and can be added to the Bitrix24 phone field when the demo's consent and ownership rules are finalized.
+
+## Security and production hardening
+
+The Bitrix24 webhook is used only on the server and is never sent to the browser. Before production use, add Twilio signature validation, request idempotency keyed by call ID, structured call logging, rate limiting, and a retry/fallback path for low-confidence speech recognition.
+
+## Developer
+
+Built and maintained by **Afaq Ahmad**.
+
+This MVP intentionally keeps the dialog narrow so short-sentence answers can be processed reliably without human intervention.
