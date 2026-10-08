@@ -19,23 +19,23 @@ export async function extractLeadFields(answers: { service: string; company: str
   return output
 }
 
-export async function createBitrixLead(lead: LeadFields) {
+export async function createBitrixLead(lead: LeadFields, callerPhone = '') {
   const webhook = process.env.BITRIX24_WEBHOOK_URL
   if (!webhook) throw new Error('BITRIX24_WEBHOOK_URL is not configured')
+
+  const fields: Record<string, unknown> = {
+    TITLE: `Inbound call — ${lead.desiredService}`,
+    COMPANY_TITLE: lead.companyName,
+    SOURCE_ID: process.env.BITRIX24_SOURCE_ID ?? 'CALL',
+    SOURCE_DESCRIPTION: `Contact preference: ${lead.contactChannel}`,
+    COMMENTS: JSON.stringify(lead),
+  }
+  if (callerPhone) fields.PHONE = [{ VALUE: callerPhone, VALUE_TYPE: 'WORK' }]
 
   const response = await fetch(`${webhook.replace(/\/$/, '')}/crm.lead.add.json`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fields: {
-        TITLE: `Inbound call — ${lead.desiredService}`,
-        NAME: lead.companyName,
-        COMPANY_TITLE: lead.companyName,
-        SOURCE_ID: process.env.BITRIX24_SOURCE_ID ?? 'CALL',
-        SOURCE_DESCRIPTION: `Contact preference: ${lead.contactChannel}`,
-        COMMENTS: JSON.stringify(lead),
-      },
-    }),
+    body: JSON.stringify({ fields }),
     signal: AbortSignal.timeout(10000),
   })
 

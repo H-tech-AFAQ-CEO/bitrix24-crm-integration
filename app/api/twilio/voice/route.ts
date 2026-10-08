@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
+function escapeXml(value: string) {
+  return value.replace(/[<>&'\"]/g, (character) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '\"': '&quot;' })[character] ?? character)
+}
+
 function say(text: string) {
-  const voice = process.env.TWILIO_VOICE ?? 'Polly.Joanna'
-  return `<Say voice="${voice}" language="en-US">${text}</Say>`
+  const voice = escapeXml(process.env.TWILIO_VOICE ?? 'Polly.Joanna')
+  return `<Say voice="${voice}" language="en-US">${escapeXml(text)}</Say>`
 }
 
 export async function POST() {
